@@ -44,6 +44,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <event.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <netdb.h>
@@ -118,6 +119,8 @@ void	set_common_sockopts(int, int);
 int	map_tos(char *, int *);
 void	report_connect(const struct sockaddr *, socklen_t);
 void	usage(int);
+void	readcb(int, short, void *);
+void	writecb(int, short, void *);
 ssize_t drainbuf(int, unsigned char *, size_t *);
 ssize_t fillbuf(int, unsigned char *, size_t *);
 
@@ -726,6 +729,13 @@ local_listen(char *host, char *port, struct addrinfo hints)
 	return (s);
 }
 
+struct buffer {
+	struct event	*b_evin, *b_evout;
+	unsigned char	 b_buf[BUFSIZE];
+	size_t		 b_pos;
+	int		 b_fdout;
+};
+
 /*
  * readwrite()
  * Loop that polls on the network file descriptor and stdin.
@@ -733,182 +743,104 @@ local_listen(char *host, char *port, struct addrinfo hints)
 void
 readwrite(int net_fd)
 {
-	struct pollfd pfd[4];
+	struct event ev_stdin, ev_netout, ev_netin, ev_stdout;
+	struct buffer netinbuf, stdinbuf;
 	int stdin_fd = STDIN_FILENO;
 	int stdout_fd = STDOUT_FILENO;
-	unsigned char netinbuf[BUFSIZE];
-	size_t netinbufpos = 0;
-	unsigned char stdinbuf[BUFSIZE];
-	size_t stdinbufpos = 0;
-	int n, num_fds;
-	ssize_t ret;
+
+	event_init();
 
 	/* don't read from stdin if requested */
 	if (dflag)
 		stdin_fd = -1;
 
 	/* stdin */
-	pfd[POLL_STDIN].fd = stdin_fd;
-	pfd[POLL_STDIN].events = POLLIN;
+	stdinbuf.b_evin = &ev_stdin;
+	stdinbuf.b_evout = &ev_netout;
+	stdinbuf.b_pos = 0;
+	stdinbuf.b_fdout = net_fd;
+	event_set(&ev_stdin, stdin_fd, EV_READ, readcb, &stdinbuf);
+	event_add(&ev_stdin, NULL);
 
 	/* network out */
-	pfd[POLL_NETOUT].fd = net_fd;
-	pfd[POLL_NETOUT].events = 0;
+	event_set(&ev_netout, net_fd, EV_WRITE, writecb, &stdinbuf);
 
 	/* network in */
-	pfd[POLL_NETIN].fd = net_fd;
-	pfd[POLL_NETIN].events = POLLIN;
+	netinbuf.b_evin = &ev_netin;
+	netinbuf.b_evout = &ev_stdout;
+	netinbuf.b_pos = 0;
+	netinbuf.b_fdout = stdout_fd;
+	event_set(&ev_netin, net_fd, EV_READ, readcb, &netinbuf);
+	event_add(&ev_netin, NULL);
 
 	/* stdout */
-	pfd[POLL_STDOUT].fd = stdout_fd;
-	pfd[POLL_STDOUT].events = 0;
+	event_set(&ev_stdout, stdout_fd, EV_WRITE, writecb, &netinbuf);
 
-	while (1) {
-		/* both inputs are gone, buffers are empty, we are done */
-		if (pfd[POLL_STDIN].fd == -1 && pfd[POLL_NETIN].fd == -1
-		    && stdinbufpos == 0 && netinbufpos == 0) {
-			close(net_fd);
-			return;
-		}
-		/* both outputs are gone, we can't continue */
-		if (pfd[POLL_NETOUT].fd == -1 && pfd[POLL_STDOUT].fd == -1) {
-			close(net_fd);
-			return;
-		}
-		/* listen and net in gone, queues empty, done */
-		if (lflag && pfd[POLL_NETIN].fd == -1
-		    && stdinbufpos == 0 && netinbufpos == 0) {
-			close(net_fd);
-			return;
-		}
+	event_dispatch();
+	close(net_fd);
+}
 
-		/* help says -i is for "wait between lines sent". We read and
-		 * write arbitrary amounts of data, and we don't want to start
-		 * scanning for newlines, so this is as good as it gets */
-		if (iflag)
-			sleep(iflag);
+/* try to read from stdin or network */
+void
+readcb(int fd, short event, void *arg)
+{
+	struct buffer *inbuf = arg;
+	ssize_t ret;
 
-		/* poll */
-		num_fds = poll(pfd, 4, timeout);
+	if (inbuf->b_pos >= BUFSIZE)
+		return;
 
-		/* treat poll errors */
-		if (num_fds == -1) {
-			close(net_fd);
-			err(1, "polling error");
+	ret = fillbuf(fd, inbuf->b_buf, &inbuf->b_pos);
+	/* eof on net in - remove from pfd */
+	if (ret == 0)
+		shutdown(fd, SHUT_RD);
+	/* error or eof on stdin - remove from pfd */
+	if (ret == 0 || ret == -1) {
+		event_del(inbuf->b_evin);
+		inbuf->b_evin = NULL;
+		/* stdin or net in gone and queue empty? */
+		if (inbuf->b_pos == 0) {
+			shutdown(inbuf->b_fdout, SHUT_WR);
+			event_del(inbuf->b_evout);
+			inbuf->b_evout = NULL;
 		}
+		return;
+	}
+	/* read something - poll net out */
+	if (inbuf->b_evout && inbuf->b_pos > 0)
+		event_add(inbuf->b_evout, NULL);
+	/* buffer not filled - continue polling */
+	if (inbuf->b_pos < BUFSIZE)
+		event_add(inbuf->b_evin, NULL);
+}
 
-		/* timeout happened */
-		if (num_fds == 0)
-			return;
+/* try to write to network or stdout */
+void
+writecb(int fd, short event, void *arg)
+{
+	struct buffer *inbuf = arg;
+	ssize_t ret;
 
-		/* treat socket error conditions */
-		for (n = 0; n < 4; n++) {
-			if (pfd[n].revents & (POLLERR|POLLNVAL)) {
-				pfd[n].fd = -1;
-			}
-		}
-		/* reading is possible after HUP */
-		if (pfd[POLL_STDIN].events & POLLIN &&
-		    pfd[POLL_STDIN].revents & POLLHUP &&
-		    ! (pfd[POLL_STDIN].revents & POLLIN))
-				pfd[POLL_STDIN].fd = -1;
+	if (inbuf->b_pos == 0)
+		return;
 
-		if (pfd[POLL_NETIN].events & POLLIN &&
-		    pfd[POLL_NETIN].revents & POLLHUP &&
-		    ! (pfd[POLL_NETIN].revents & POLLIN))
-				pfd[POLL_NETIN].fd = -1;
-
-		if (pfd[POLL_NETOUT].revents & POLLHUP) {
-			if (Nflag)
-				shutdown(pfd[POLL_NETOUT].fd, SHUT_WR);
-			pfd[POLL_NETOUT].fd = -1;
-		}
-		/* if HUP, stop watching stdout */
-		if (pfd[POLL_STDOUT].revents & POLLHUP)
-			pfd[POLL_STDOUT].fd = -1;
-		/* if no net out, stop watching stdin */
-		if (pfd[POLL_NETOUT].fd == -1)
-			pfd[POLL_STDIN].fd = -1;
-		/* if no stdout, stop watching net in */
-		if (pfd[POLL_STDOUT].fd == -1) {
-			if (pfd[POLL_NETIN].fd != -1)
-				shutdown(pfd[POLL_NETIN].fd, SHUT_RD);
-			pfd[POLL_NETIN].fd = -1;
-		}
-
-		/* try to read from stdin */
-		if (pfd[POLL_STDIN].revents & POLLIN && stdinbufpos < BUFSIZE) {
-			ret = fillbuf(pfd[POLL_STDIN].fd, stdinbuf,
-			    &stdinbufpos);
-			/* error or eof on stdin - remove from pfd */
-			if (ret == 0 || ret == -1)
-				pfd[POLL_STDIN].fd = -1;
-			/* read something - poll net out */
-			if (stdinbufpos > 0)
-				pfd[POLL_NETOUT].events = POLLOUT;
-			/* filled buffer - remove self from polling */
-			if (stdinbufpos == BUFSIZE)
-				pfd[POLL_STDIN].events = 0;
-		}
-		/* try to write to network */
-		if (pfd[POLL_NETOUT].revents & POLLOUT && stdinbufpos > 0) {
-			ret = drainbuf(pfd[POLL_NETOUT].fd, stdinbuf,
-			    &stdinbufpos);
-			if (ret == -1)
-				pfd[POLL_NETOUT].fd = -1;
-			/* buffer empty - remove self from polling */
-			if (stdinbufpos == 0)
-				pfd[POLL_NETOUT].events = 0;
-			/* buffer no longer full - poll stdin again */
-			if (stdinbufpos < BUFSIZE)
-				pfd[POLL_STDIN].events = POLLIN;
-		}
-		/* try to read from network */
-		if (pfd[POLL_NETIN].revents & POLLIN && netinbufpos < BUFSIZE) {
-			ret = fillbuf(pfd[POLL_NETIN].fd, netinbuf,
-			    &netinbufpos);
-			if (ret == -1)
-				pfd[POLL_NETIN].fd = -1;
-			/* eof on net in - remove from pfd */
-			if (ret == 0) {
-				shutdown(pfd[POLL_NETIN].fd, SHUT_RD);
-				pfd[POLL_NETIN].fd = -1;
-			}
-			/* read something - poll stdout */
-			if (netinbufpos > 0)
-				pfd[POLL_STDOUT].events = POLLOUT;
-			/* filled buffer - remove self from polling */
-			if (netinbufpos == BUFSIZE)
-				pfd[POLL_NETIN].events = 0;
-			/* handle telnet */
-			if (tflag)
-				atelnet(pfd[POLL_NETIN].fd, netinbuf,
-				    netinbufpos);
-		}
-		/* try to write to stdout */
-		if (pfd[POLL_STDOUT].revents & POLLOUT && netinbufpos > 0) {
-			ret = drainbuf(pfd[POLL_STDOUT].fd, netinbuf,
-			    &netinbufpos);
-			if (ret == -1)
-				pfd[POLL_STDOUT].fd = -1;
-			/* buffer empty - remove self from polling */
-			if (netinbufpos == 0)
-				pfd[POLL_STDOUT].events = 0;
-			/* buffer no longer full - poll net in again */
-			if (netinbufpos < BUFSIZE)
-				pfd[POLL_NETIN].events = POLLIN;
-		}
-
-		/* stdin gone and queue empty? */
-		if (pfd[POLL_STDIN].fd == -1 && stdinbufpos == 0) {
-			if (pfd[POLL_NETOUT].fd != -1 && Nflag)
-				shutdown(pfd[POLL_NETOUT].fd, SHUT_WR);
-			pfd[POLL_NETOUT].fd = -1;
-		}
-		/* net in gone and queue empty? */
-		if (pfd[POLL_NETIN].fd == -1 && netinbufpos == 0) {
-			pfd[POLL_STDOUT].fd = -1;
-		}
+	ret = drainbuf(fd, inbuf->b_buf, &inbuf->b_pos);
+	if (ret == -1) {
+		event_del(inbuf->b_evout);
+		inbuf->b_evout = NULL;
+		return;
+	}
+	/* buffer not empty - continue polling */
+	if (inbuf->b_pos > 0)
+		event_add(inbuf->b_evout, NULL);
+	/* buffer no longer full - poll stdin again */
+	if (inbuf->b_evin && inbuf->b_pos < BUFSIZE)
+		event_add(inbuf->b_evin, NULL);
+	/* stdin or net in gone and queue empty? */
+	if (inbuf->b_evin == NULL && inbuf->b_pos == 0) {
+		shutdown(fd, SHUT_WR);
+		event_del(inbuf->b_evout);
+		inbuf->b_evout = NULL;
 	}
 }
 

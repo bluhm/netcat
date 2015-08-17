@@ -2,5 +2,8 @@
 
 PROG=	nc
 SRCS=	netcat.c atomicio.c socks.c
+LDADD=	-levent
+DPADD=	${LIBEVENT}
+
 
 .include <bsd.prog.mk>
