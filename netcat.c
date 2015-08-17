@@ -95,7 +95,7 @@ int	Sflag;					/* TCP MD5 signature option */
 int	Tflag = -1;				/* IP Type of Service */
 int	rtableid = -1;
 
-int timeout = -1;
+int timeout = INFTIM;
 int family = AF_UNSPEC;
 char *portlist[PORT_MAX+1];
 char *unix_dg_tmp_socket;
@@ -397,8 +397,8 @@ main(int argc, char *argv[])
 				readwrite(s);
 			} else {
 				len = sizeof(cliaddr);
-				connfd = accept(s, (struct sockaddr *)&cliaddr,
-				    &len);
+				connfd = accept4(s, (struct sockaddr *)&cliaddr,
+				    &len, SOCK_NONBLOCK);
 				if (connfd == -1) {
 					/* For now, all errnos are fatal */
 					err(1, "accept");
@@ -594,8 +594,8 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 
 	res0 = res;
 	do {
-		if ((s = socket(res0->ai_family, res0->ai_socktype,
-		    res0->ai_protocol)) < 0)
+		if ((s = socket(res0->ai_family, res0->ai_socktype |
+		    SOCK_NONBLOCK, res0->ai_protocol)) < 0)
 			continue;
 
 		if (rtableid >= 0 && (setsockopt(s, SOL_SOCKET, SO_RTABLE,
@@ -644,14 +644,8 @@ timeout_connect(int s, const struct sockaddr *name, socklen_t namelen)
 {
 	struct pollfd pfd;
 	socklen_t optlen;
-	int flags, optval;
+	int optval;
 	int ret;
-
-	if (timeout != -1) {
-		flags = fcntl(s, F_GETFL, 0);
-		if (fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
-			err(1, "set non-blocking mode");
-	}
 
 	if ((ret = connect(s, name, namelen)) != 0 && errno == EINPROGRESS) {
 		pfd.fd = s;
@@ -669,9 +663,6 @@ timeout_connect(int s, const struct sockaddr *name, socklen_t namelen)
 		} else
 			err(1, "poll failed");
 	}
-
-	if (timeout != -1 && fcntl(s, F_SETFL, flags) == -1)
-		err(1, "restoring flags");
 
 	return (ret);
 }
