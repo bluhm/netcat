@@ -118,7 +118,7 @@ void	set_common_sockopts(int, int);
 int	map_tos(char *, int *);
 void	report_connect(const struct sockaddr *, socklen_t);
 void	usage(int);
-ssize_t drainbuf(int, unsigned char *, size_t *);
+ssize_t drainbuf(int, unsigned char *, size_t *, size_t);
 ssize_t fillbuf(int, unsigned char *, size_t *);
 
 int
@@ -749,8 +749,14 @@ readwrite(int net_fd)
 	size_t netinbufpos = 0;
 	unsigned char stdinbuf[BUFSIZE];
 	size_t stdinbufpos = 0;
+	long lowat;
+	socklen_t optlen;
 	int n, num_fds;
 	ssize_t ret;
+
+	optlen = sizeof(lowat);
+	if (getsockopt(net_fd, SOL_SOCKET, SO_SNDLOWAT, &lowat, &optlen) == -1)
+		err(1, "getsockopt SO_SNDLOWAT");
 
 	/* don't read from stdin if requested */
 	if (dflag)
@@ -862,7 +868,7 @@ readwrite(int net_fd)
 		/* try to write to network */
 		if (pfd[POLL_NETOUT].revents & POLLOUT && stdinbufpos > 0) {
 			ret = drainbuf(pfd[POLL_NETOUT].fd, stdinbuf,
-			    &stdinbufpos);
+			    &stdinbufpos, lowat);
 			if (ret == -1)
 				pfd[POLL_NETOUT].fd = -1;
 			/* buffer empty - remove self from polling */
@@ -897,7 +903,7 @@ readwrite(int net_fd)
 		/* try to write to stdout */
 		if (pfd[POLL_STDOUT].revents & POLLOUT && netinbufpos > 0) {
 			ret = drainbuf(pfd[POLL_STDOUT].fd, netinbuf,
-			    &netinbufpos);
+			    &netinbufpos, BUFSIZE);
 			if (ret == -1)
 				pfd[POLL_STDOUT].fd = -1;
 			/* buffer empty - remove self from polling */
@@ -922,12 +928,14 @@ readwrite(int net_fd)
 }
 
 ssize_t
-drainbuf(int fd, unsigned char *buf, size_t *bufpos)
+drainbuf(int fd, unsigned char *buf, size_t *bufpos, size_t lowat)
 {
 	ssize_t n;
 	ssize_t adjust;
 
-	n = write(fd, buf, *bufpos);
+	if (*bufpos < lowat)
+		lowat = *bufpos;
+	n = write(fd, buf, lowat);
 	/* don't treat EAGAIN, EINTR as error */
 	if (n == -1 && (errno == EAGAIN || errno == EINTR))
 		n = -2;
