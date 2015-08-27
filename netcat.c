@@ -95,7 +95,7 @@ int	Sflag;					/* TCP MD5 signature option */
 int	Tflag = -1;				/* IP Type of Service */
 int	rtableid = -1;
 
-int timeout = INFTIM;
+int timeout = -1;
 int family = AF_UNSPEC;
 char *portlist[PORT_MAX+1];
 char *unix_dg_tmp_socket;
