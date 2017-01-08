@@ -747,6 +747,7 @@ timeout_handshake(int s, struct tls *tls_ctx)
 		else if (ret == 0) {
 			errno = ETIMEDOUT;
 			ret = -1;
+			break;
 		} else
 			err(1, "poll failed");
 	}
