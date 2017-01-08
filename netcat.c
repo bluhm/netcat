@@ -736,16 +736,13 @@ handshake(int sockfd, struct tls *tls_ctx)
 	bzero(&pfd, sizeof(pfd));
 	pfd.fd = sockfd;
 	while ((ret = tls_handshake(tls_ctx)) != 0) {
-		if (ret == -1)
-			break;
-		pfd.events = 0;
 		if (ret == TLS_WANT_POLLIN)
 			pfd.events = POLLIN;
 		else if (ret == TLS_WANT_POLLOUT)
 			pfd.events = POLLOUT;
-		if (pfd.events == 0)
-			err(1, "no events");
-		else if (poll(&pfd, 1, -1) == -1)
+		else
+			break;
+		if (poll(&pfd, 1, -1) == -1)
 			err(1, "poll");
 	}
 	return (ret);
