@@ -121,6 +121,7 @@ int	local_listen(char *, char *, struct addrinfo);
 void	readwrite(int, struct tls *);
 void	fdpass(int nfd) __attribute__((noreturn));
 int	remote_connect(const char *, const char *, struct addrinfo);
+int	timeout_handshake(int, struct tls *);
 int	timeout_connect(int, const struct sockaddr *, socklen_t);
 int	socks_connect(const char *, const char *, struct addrinfo,
 	    const char *, const char *, struct addrinfo, int, const char *);
@@ -728,13 +729,11 @@ unix_bind(char *path, int flags)
 }
 
 int
-handshake(int sockfd, struct tls *tls_ctx)
+timeout_handshake(int s, struct tls *tls_ctx)
 {
 	struct pollfd pfd;
 	int ret;
 
-	bzero(&pfd, sizeof(pfd));
-	pfd.fd = sockfd;
 	while ((ret = tls_handshake(tls_ctx)) != 0) {
 		if (ret == TLS_WANT_POLLIN)
 			pfd.events = POLLIN;
@@ -742,9 +741,16 @@ handshake(int sockfd, struct tls *tls_ctx)
 			pfd.events = POLLOUT;
 		else
 			break;
-		if (poll(&pfd, 1, -1) == -1)
-			err(1, "poll");
+		pfd.fd = s;
+		if ((ret = poll(&pfd, 1, timeout)) == 1)
+			continue;
+		else if (ret == 0) {
+			errno = ETIMEDOUT;
+			ret = -1;
+		} else
+			err(1, "poll failed");
 	}
+
 	return (ret);
 }
 
@@ -756,7 +762,7 @@ tls_setup_client(struct tls *tls_ctx, int s, char *host)
 		errx(1, "tls connection failed (%s)",
 		    tls_error(tls_ctx));
 	}
-	if (handshake(s, tls_ctx) == -1)
+	if (timeout_handshake(s, tls_ctx) == -1)
 		errx(1, "tls handshake failed (%s)",
 		    tls_error(tls_ctx));
 	if (vflag)
@@ -776,7 +782,7 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 		warnx("tls accept failed (%s)",
 		    tls_error(tls_ctx));
 		tls_cctx = NULL;
-	} else if (handshake(connfd, tls_cctx) == -1) {
+	} else if (timeout_handshake(connfd, tls_cctx) == -1) {
 			warnx("tls handshake failed (%s)",
 			    tls_error(tls_cctx));
 	}
