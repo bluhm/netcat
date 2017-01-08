@@ -763,9 +763,10 @@ tls_setup_client(struct tls *tls_ctx, int s, char *host)
 		errx(1, "tls connection failed (%s)",
 		    tls_error(tls_ctx));
 	}
-	if (timeout_handshake(s, tls_ctx) == -1)
+	if (timeout_handshake(s, tls_ctx) == -1) {
 		errx(1, "tls handshake failed (%s)",
-		    tls_error(tls_ctx));
+		    tls_error(tls_ctx) ? tls_error(tls_ctx) : strerror(errno));
+	}
 	if (vflag)
 		report_tls(tls_ctx, host, tls_expectname);
 	if (tls_expecthash && tls_peer_cert_hash(tls_ctx) &&
@@ -784,8 +785,8 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 		    tls_error(tls_ctx));
 		tls_cctx = NULL;
 	} else if (timeout_handshake(connfd, tls_cctx) == -1) {
-			warnx("tls handshake failed (%s)",
-			    tls_error(tls_cctx));
+		warnx("tls handshake failed (%s)",
+		    tls_error(tls_ctx) ? tls_error(tls_ctx) : strerror(errno));
 	}
 	if (tls_cctx) {
 		int gotcert = tls_peer_cert_provided(tls_cctx);
