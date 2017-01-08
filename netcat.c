@@ -727,21 +727,41 @@ unix_bind(char *path, int flags)
 	return (s);
 }
 
+int
+handshake(int sockfd, struct tls *tls_ctx)
+{
+	struct pollfd pfd;
+	int ret;
+
+	bzero(&pfd, sizeof(pfd));
+	pfd.fd = sockfd;
+	while ((ret = tls_handshake(tls_ctx)) != 0) {
+		if (ret == -1)
+			break;
+		pfd.events = 0;
+		if (ret == TLS_WANT_POLLIN)
+			pfd.events = POLLIN;
+		else if (ret == TLS_WANT_POLLOUT)
+			pfd.events = POLLOUT;
+		if (pfd.events == 0)
+			err(1, "no events");
+		else if (poll(&pfd, 1, -1) == -1)
+			err(1, "poll");
+	}
+	return (ret);
+}
+
 void
 tls_setup_client(struct tls *tls_ctx, int s, char *host)
 {
-	int i;
-
 	if (tls_connect_socket(tls_ctx, s,
 		tls_expectname ? tls_expectname : host) == -1) {
 		errx(1, "tls connection failed (%s)",
 		    tls_error(tls_ctx));
 	}
-	do {
-		if ((i = tls_handshake(tls_ctx)) == -1)
-			errx(1, "tls handshake failed (%s)",
-			    tls_error(tls_ctx));
-	} while (i == TLS_WANT_POLLIN || i == TLS_WANT_POLLOUT);
+	if (handshake(s, tls_ctx) == -1)
+		errx(1, "tls handshake failed (%s)",
+		    tls_error(tls_ctx));
 	if (vflag)
 		report_tls(tls_ctx, host, tls_expectname);
 	if (tls_expecthash && tls_peer_cert_hash(tls_ctx) &&
@@ -759,14 +779,9 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 		warnx("tls accept failed (%s)",
 		    tls_error(tls_ctx));
 		tls_cctx = NULL;
-	} else {
-		int i;
-
-		do {
-			if ((i = tls_handshake(tls_cctx)) == -1)
-				warnx("tls handshake failed (%s)",
-				    tls_error(tls_cctx));
-		} while(i == TLS_WANT_POLLIN || i == TLS_WANT_POLLOUT);
+	} else if (handshake(connfd, tls_cctx) == -1) {
+			warnx("tls handshake failed (%s)",
+			    tls_error(tls_cctx));
 	}
 	if (tls_cctx) {
 		int gotcert = tls_peer_cert_provided(tls_cctx);
