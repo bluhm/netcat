@@ -758,14 +758,17 @@ timeout_handshake(int s, struct tls *tls_ctx)
 void
 tls_setup_client(struct tls *tls_ctx, int s, char *host)
 {
+	const char *errstr;
+
 	if (tls_connect_socket(tls_ctx, s,
 		tls_expectname ? tls_expectname : host) == -1) {
 		errx(1, "tls connection failed (%s)",
 		    tls_error(tls_ctx));
 	}
 	if (timeout_handshake(s, tls_ctx) == -1) {
-		errx(1, "tls handshake failed (%s)",
-		    tls_error(tls_ctx) ? tls_error(tls_ctx) : strerror(errno));
+		if ((errstr = tls_error(tls_ctx)) == NULL)
+			errstr = strerror(errno);
+		errx(1, "tls handshake failed (%s)", errstr);
 	}
 	if (vflag)
 		report_tls(tls_ctx, host, tls_expectname);
@@ -778,17 +781,15 @@ struct tls *
 tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 {
 	struct tls *tls_cctx;
+	const char *errstr;
 
-	if (tls_accept_socket(tls_ctx, &tls_cctx,
-		connfd) == -1) {
-		warnx("tls accept failed (%s)",
-		    tls_error(tls_ctx));
-		tls_cctx = NULL;
+	if (tls_accept_socket(tls_ctx, &tls_cctx, connfd) == -1) {
+		warnx("tls accept failed (%s)", tls_error(tls_ctx));
 	} else if (timeout_handshake(connfd, tls_cctx) == -1) {
-		warnx("tls handshake failed (%s)",
-		    tls_error(tls_ctx) ? tls_error(tls_ctx) : strerror(errno));
-	}
-	if (tls_cctx) {
+		if ((errstr = tls_error(tls_ctx)) == NULL)
+			errstr = strerror(errno);
+		warnx("tls handshake failed (%s)", errstr);
+	} else {
 		int gotcert = tls_peer_cert_provided(tls_cctx);
 
 		if (vflag && gotcert)
