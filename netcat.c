@@ -1047,21 +1047,15 @@ readwrite(int net_fd, struct tls *tls_ctx)
 	while (1) {
 		/* both inputs are gone, buffers are empty, we are done */
 		if (pfd[POLL_STDIN].fd == -1 && pfd[POLL_NETIN].fd == -1 &&
-		    stdinbufpos == 0 && netinbufpos == 0) {
-			close(net_fd);
+		    stdinbufpos == 0 && netinbufpos == 0)
 			return;
-		}
 		/* both outputs are gone, we can't continue */
-		if (pfd[POLL_NETOUT].fd == -1 && pfd[POLL_STDOUT].fd == -1) {
-			close(net_fd);
+		if (pfd[POLL_NETOUT].fd == -1 && pfd[POLL_STDOUT].fd == -1)
 			return;
-		}
 		/* listen and net in gone, queues empty, done */
 		if (lflag && pfd[POLL_NETIN].fd == -1 &&
-		    stdinbufpos == 0 && netinbufpos == 0) {
-			close(net_fd);
+		    stdinbufpos == 0 && netinbufpos == 0)
 			return;
-		}
 
 		/* help says -i is for "wait between lines sent". We read and
 		 * write arbitrary amounts of data, and we don't want to start
@@ -1073,10 +1067,8 @@ readwrite(int net_fd, struct tls *tls_ctx)
 		num_fds = poll(pfd, 4, timeout);
 
 		/* treat poll errors */
-		if (num_fds == -1) {
-			close(net_fd);
+		if (num_fds == -1)
 			err(1, "polling error");
-		}
 
 		/* timeout happened */
 		if (num_fds == 0)
