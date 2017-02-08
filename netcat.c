@@ -578,12 +578,7 @@ main(int argc, char *argv[])
 				if (!usetls)
 					readwrite(connfd, NULL);
 				if (tls_cctx) {
-					int i;
-
-					do {
-						i = tls_close(tls_cctx);
-					} while (i == TLS_WANT_POLLIN ||
-					    i == TLS_WANT_POLLOUT);
+					timeout_tls(s, tls_cctx, tls_close);
 					tls_free(tls_cctx);
 					tls_cctx = NULL;
 				}
@@ -673,12 +668,7 @@ main(int argc, char *argv[])
 				if (!zflag)
 					readwrite(s, tls_ctx);
 				if (tls_ctx) {
-					int j;
-
-					do {
-						j = tls_close(tls_ctx);
-					} while (j == TLS_WANT_POLLIN ||
-					    j == TLS_WANT_POLLOUT);
+					timeout_tls(s, tls_ctx, tls_close);
 					tls_free(tls_ctx);
 					tls_ctx = NULL;
 				}
