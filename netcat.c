@@ -597,8 +597,9 @@ main(int argc, char *argv[])
 	} else if (family == AF_UNIX) {
 		ret = 0;
 
-		if ((s = unix_connect(host)) > 0 && !zflag) {
-			readwrite(s, NULL);
+		if ((s = unix_connect(host)) > 0) {
+			if (!zflag)
+				readwrite(s, NULL);
 			close(s);
 		} else
 			ret = 1;
