@@ -777,7 +777,7 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 	if (tls_accept_socket(tls_ctx, &tls_cctx, connfd) == -1) {
 		warnx("tls accept failed (%s)", tls_error(tls_ctx));
 	} else if (timeout_tls(connfd, tls_cctx, tls_handshake) == -1) {
-		if ((errstr = tls_error(tls_ctx)) == NULL)
+		if ((errstr = tls_error(tls_cctx)) == NULL)
 			errstr = strerror(errno);
 		warnx("tls handshake failed (%s)", errstr);
 	} else {
