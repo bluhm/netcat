@@ -1719,6 +1719,7 @@ help(void)
 	\t-u		UDP mode\n\
 	\t-V rtable	Specify alternate routing table\n\
 	\t-v		Verbose\n\
+	\t-W recvlimit	Terminate after receiving a number of packets\n\
 	\t-w timeout	Timeout for connects and final net reads\n\
 	\t-X proto	Proxy protocol: \"4\", \"5\" (SOCKS) or \"connect\"\n\
 	\t-x addr[:port]\tSpecify proxy address and port\n\
@@ -1737,10 +1738,11 @@ usage(int ret)
 	    "\t  [-i interval] [-K keyfile] [-M ttl] [-m minttl] [-O length]\n"
 	    "\t  [-o staplefile] [-P proxy_username] [-p source_port] "
 	    "[-R CAfile]\n"
-	    "\t  [-s source] [-T keyword] [-V rtable] [-w timeout] "
-	    "[-X proxy_protocol]\n"
-	    "\t  [-x proxy_address[:port]] [-Z peercertfile] "
-	    "[destination] [port]\n");
+	    "\t  [-s source] [-T keyword] [-V rtable] [-W recvlimit ] "
+	    "[-w timeout]\n"
+	    "\t  [-X proxy_protocol] [-x proxy_address[:port]] "
+	    "[-Z peercertfile]\n"
+	    "\t  [destination] [port]\n");
 	if (ret)
 		exit(1);
 }
