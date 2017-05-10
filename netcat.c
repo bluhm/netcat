@@ -117,6 +117,7 @@ int ttl = -1;
 int minttl = -1;
 
 void	atelnet(int, unsigned char *, unsigned int);
+int	strtoport(char *portstr, int udp);
 void	build_ports(char *);
 void	help(void);
 int	local_listen(char *, char *, struct addrinfo);
