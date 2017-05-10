@@ -1583,7 +1583,6 @@ save_peer_cert(struct tls *tls_ctx, FILE *fp)
 {
 	const char *pem;
 	size_t plen;
-	FILE *out;
 
 	if ((pem = tls_peer_cert_chain_pem(tls_ctx, &plen)) == NULL)
 		errx(1, "Can't get peer certificate");
