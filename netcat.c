@@ -137,7 +137,7 @@ int	map_tos(char *, int *);
 int	map_tls(char *, int *);
 void	save_peer_cert(struct tls *_tls_ctx, FILE *_fp);
 void	report_connect(const struct sockaddr *, socklen_t, char *);
-void	report_tls(struct tls *tls_ctx, char * host, char *tls_expectname);
+void	report_tls(struct tls *tls_ctx, char * host);
 void	usage(int);
 ssize_t drainbuf(int, unsigned char *, size_t *, struct tls *);
 ssize_t fillbuf(int, unsigned char *, size_t *, struct tls *);
@@ -781,7 +781,7 @@ tls_setup_client(struct tls *tls_ctx, int s, char *host)
 		errx(1, "tls handshake failed (%s)", errstr);
 	}
 	if (vflag)
-		report_tls(tls_ctx, host, tls_expectname);
+		report_tls(tls_ctx, host);
 	if (tls_expecthash && tls_peer_cert_hash(tls_ctx) &&
 	    strcmp(tls_expecthash, tls_peer_cert_hash(tls_ctx)) != 0)
 		errx(1, "peer certificate is not %s", tls_expecthash);
@@ -808,7 +808,7 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 		int gotcert = tls_peer_cert_provided(tls_cctx);
 
 		if (vflag && gotcert)
-			report_tls(tls_cctx, host, tls_expectname);
+			report_tls(tls_cctx, host);
 		if ((TLSopt & TLS_CCERT) && !gotcert)
 			warnx("No client certificate provided");
 		else if (gotcert && tls_peer_cert_hash(tls_ctx) && tls_expecthash &&
@@ -1593,7 +1593,7 @@ save_peer_cert(struct tls *tls_ctx, FILE *fp)
 }
 
 void
-report_tls(struct tls * tls_ctx, char * host, char *tls_expectname)
+report_tls(struct tls * tls_ctx, char * host)
 {
 	time_t t;
 	const char *ocsp_url;
