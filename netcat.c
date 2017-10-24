@@ -563,13 +563,12 @@ main(int argc, char *argv[])
 				 * initially to wait for a caller, then use
 				 * the regular functions to talk to the caller.
 				 */
-				int rv, plen;
-				char buf[16384];
+				int rv;
+				char buf[2048];
 				struct sockaddr_storage z;
 
 				len = sizeof(z);
-				plen = 2048;
-				rv = recvfrom(s, buf, plen, MSG_PEEK,
+				rv = recvfrom(s, buf, sizeof(buf), MSG_PEEK,
 				    (struct sockaddr *)&z, &len);
 				if (rv < 0)
 					err(1, "recvfrom");
