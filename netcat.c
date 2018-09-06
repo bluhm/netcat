@@ -565,7 +565,7 @@ main(int argc, char *argv[])
 		/* Allow only one connection at a time, but stay alive. */
 		for (;;) {
 			if (family != AF_UNIX) {
-				if (s == -1)
+				if (s != -1)
 					close(s);
 				s = local_listen(host, uport, hints);
 			}
