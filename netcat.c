@@ -564,8 +564,11 @@ main(int argc, char *argv[])
 		}
 		/* Allow only one connection at a time, but stay alive. */
 		for (;;) {
-			if (family != AF_UNIX)
+			if (family != AF_UNIX) {
+				if (s == -1)
+					close(s);
 				s = local_listen(host, uport, hints);
+			}
 			if (s < 0)
 				err(1, NULL);
 			if (uflag && kflag) {
@@ -622,9 +625,7 @@ main(int argc, char *argv[])
 				}
 				close(connfd);
 			}
-			if (family != AF_UNIX)
-				close(s);
-			else if (uflag) {
+			if (family == AF_UNIX && uflag) {
 				if (connect(s, NULL, 0) < 0)
 					err(1, "connect");
 			}
