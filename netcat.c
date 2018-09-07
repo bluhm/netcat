@@ -122,7 +122,7 @@ void	atelnet(int, unsigned char *, unsigned int);
 int	strtoport(char *portstr, int udp);
 void	build_ports(char *);
 void	help(void) __attribute__((noreturn));
-int	local_listen(char *, char *, struct addrinfo);
+int	local_listen(const char *, const char *, struct addrinfo);
 void	readwrite(int, struct tls *);
 void	fdpass(int nfd) __attribute__((noreturn));
 int	remote_connect(const char *, const char *, struct addrinfo);
@@ -994,7 +994,7 @@ timeout_connect(int s, const struct sockaddr *name, socklen_t namelen)
  * address. Returns -1 on failure.
  */
 int
-local_listen(char *host, char *port, struct addrinfo hints)
+local_listen(const char *host, const char *port, struct addrinfo hints)
 {
 	struct addrinfo *res, *res0;
 	int s = -1, ret, x = 1, save_errno;
