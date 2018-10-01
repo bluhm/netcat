@@ -633,6 +633,11 @@ main(int argc, char *argv[])
 			if (!kflag)
 				break;
 		}
+
+		if (tls_ctx) {
+			tls_free(tls_ctx);
+			tls_ctx = NULL;
+		}
 	} else if (family == AF_UNIX) {
 		ret = 0;
 
