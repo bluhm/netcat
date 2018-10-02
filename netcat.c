@@ -543,7 +543,6 @@ main(int argc, char *argv[])
 			err(1, "pledge");
 	}
 	if (lflag) {
-		struct tls *tls_cctx = NULL;
 		int connfd;
 		ret = 0;
 
@@ -603,6 +602,8 @@ main(int argc, char *argv[])
 
 				readwrite(s, NULL);
 			} else {
+				struct tls *tls_cctx = NULL;
+
 				len = sizeof(cliaddr);
 				connfd = accept4(s, (struct sockaddr *)&cliaddr,
 				    &len, SOCK_NONBLOCK);
@@ -618,12 +619,10 @@ main(int argc, char *argv[])
 					readwrite(connfd, tls_cctx);
 				if (!usetls)
 					readwrite(connfd, NULL);
-				if (tls_cctx) {
+				if (tls_cctx)
 					timeout_tls(s, tls_cctx, tls_close);
-					tls_free(tls_cctx);
-					tls_cctx = NULL;
-				}
 				close(connfd);
+				tls_free(tls_cctx);
 			}
 			if (family == AF_UNIX && uflag) {
 				if (connect(s, NULL, 0) < 0)
@@ -657,6 +656,8 @@ main(int argc, char *argv[])
 		for (s = -1, i = 0; portlist[i] != NULL; i++) {
 			if (s != -1)
 				close(s);
+			tls_free(tls_ctx);
+			tls_ctx = NULL;
 
 			if (usetls) {
 				if ((tls_ctx = tls_client()) == NULL)
@@ -707,18 +708,15 @@ main(int argc, char *argv[])
 					tls_setup_client(tls_ctx, s, host);
 				if (!zflag)
 					readwrite(s, tls_ctx);
-				if (tls_ctx) {
+				if (tls_ctx)
 					timeout_tls(s, tls_ctx, tls_close);
-					tls_free(tls_ctx);
-					tls_ctx = NULL;
-				}
 			}
 		}
 	}
 
 	if (s != -1)
 		close(s);
-
+	tls_free(tls_ctx);
 	tls_config_free(tls_cfg);
 
 	return ret;
