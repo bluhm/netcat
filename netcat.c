@@ -543,7 +543,6 @@ main(int argc, char *argv[])
 			err(1, "pledge");
 	}
 	if (lflag) {
-		int connfd;
 		ret = 0;
 
 		if (family == AF_UNIX) {
@@ -603,6 +602,7 @@ main(int argc, char *argv[])
 				readwrite(s, NULL);
 			} else {
 				struct tls *tls_cctx = NULL;
+				int connfd;
 
 				len = sizeof(cliaddr);
 				connfd = accept4(s, (struct sockaddr *)&cliaddr,
