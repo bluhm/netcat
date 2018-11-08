@@ -894,15 +894,16 @@ int
 unix_listen(char *path)
 {
 	int s;
+
 	if ((s = unix_bind(path, 0)) < 0)
 		return -1;
-
 	if (listen(s, 5) < 0) {
 		close(s);
 		return -1;
 	}
 	if (vflag)
 		report_sock("Listening", NULL, 0, path);
+
 	return s;
 }
 
