@@ -756,6 +756,8 @@ unix_bind(char *path, int flags)
 		errno = save_errno;
 		return -1;
 	}
+	if (vflag)
+		report_sock("Bound", NULL, 0, path);
 
 	return s;
 }
@@ -899,6 +901,8 @@ unix_listen(char *path)
 		close(s);
 		return -1;
 	}
+	if (vflag)
+		report_sock("Listening", NULL, 0, path);
 	return s;
 }
 
@@ -1038,6 +1042,16 @@ local_listen(const char *host, const char *port, struct addrinfo hints)
 	if (!uflag && s != -1) {
 		if (listen(s, 1) < 0)
 			err(1, "listen");
+	}
+	if (vflag && s != -1) {
+		struct sockaddr_storage ss;
+		socklen_t len;
+
+		len = sizeof(ss);
+		if (getsockname(s, (struct sockaddr *)&ss, &len) == -1)
+		    err(1, "getsockname");
+		report_sock(uflag ? "Bound" : "Listening",
+		    (struct sockaddr *)&ss, len, NULL);
 	}
 
 	freeaddrinfo(res0);
