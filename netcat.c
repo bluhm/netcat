@@ -1,4 +1,4 @@
-/* $OpenBSD: netcat.c,v 1.194 2018/09/07 09:55:29 bluhm Exp $ */
+/* $OpenBSD: netcat.c,v 1.197 2018/11/06 20:39:19 jsing Exp $ */
 /*
  * Copyright (c) 2001 Eric Jackson <ericj@monkey.org>
  * Copyright (c) 2015 Bob Beck.  All rights reserved.
@@ -66,7 +66,6 @@
 #define POLL_NETIN	2
 #define POLL_STDOUT	3
 #define BUFSIZE		16384
-#define DEFAULT_CA_FILE	"/etc/ssl/cert.pem"
 
 #define TLS_NOVERIFY	(1 << 1)
 #define TLS_NONAME	(1 << 2)
@@ -101,7 +100,7 @@ int	usetls;					/* use TLS */
 char    *Cflag;					/* Public cert file */
 char    *Kflag;					/* Private key file */
 char    *oflag;					/* OCSP stapling file */
-char    *Rflag = DEFAULT_CA_FILE;		/* Root CA file */
+char    *Rflag = TLS_CA_CERT_FILE;		/* Root CA file */
 int	tls_cachanged;				/* Using non-default CA file */
 int     TLSopt;					/* TLS options */
 char	*tls_expectname;			/* required name in peer cert */
@@ -543,8 +542,6 @@ main(int argc, char *argv[])
 			err(1, "pledge");
 	}
 	if (lflag) {
-		struct tls *tls_cctx = NULL;
-		int connfd;
 		ret = 0;
 
 		if (family == AF_UNIX) {
@@ -603,6 +600,9 @@ main(int argc, char *argv[])
 
 				readwrite(s, NULL);
 			} else {
+				struct tls *tls_cctx = NULL;
+				int connfd;
+
 				len = sizeof(cliaddr);
 				connfd = accept4(s, (struct sockaddr *)&cliaddr,
 				    &len, SOCK_NONBLOCK);
@@ -618,12 +618,10 @@ main(int argc, char *argv[])
 					readwrite(connfd, tls_cctx);
 				if (!usetls)
 					readwrite(connfd, NULL);
-				if (tls_cctx) {
+				if (tls_cctx)
 					timeout_tls(s, tls_cctx, tls_close);
-					tls_free(tls_cctx);
-					tls_cctx = NULL;
-				}
 				close(connfd);
+				tls_free(tls_cctx);
 			}
 			if (family == AF_UNIX && uflag) {
 				if (connect(s, NULL, 0) < 0)
@@ -640,8 +638,10 @@ main(int argc, char *argv[])
 			if (!zflag)
 				readwrite(s, NULL);
 			close(s);
-		} else
+		} else {
+			warn("%s", host);
 			ret = 1;
+		}
 
 		if (uflag)
 			unlink(unix_dg_tmp_socket);
@@ -657,6 +657,8 @@ main(int argc, char *argv[])
 		for (s = -1, i = 0; portlist[i] != NULL; i++) {
 			if (s != -1)
 				close(s);
+			tls_free(tls_ctx);
+			tls_ctx = NULL;
 
 			if (usetls) {
 				if ((tls_ctx = tls_client()) == NULL)
@@ -707,18 +709,15 @@ main(int argc, char *argv[])
 					tls_setup_client(tls_ctx, s, host);
 				if (!zflag)
 					readwrite(s, tls_ctx);
-				if (tls_ctx) {
+				if (tls_ctx)
 					timeout_tls(s, tls_ctx, tls_close);
-					tls_free(tls_ctx);
-					tls_ctx = NULL;
-				}
 			}
 		}
 	}
 
 	if (s != -1)
 		close(s);
-
+	tls_free(tls_ctx);
 	tls_config_free(tls_cfg);
 
 	return ret;
