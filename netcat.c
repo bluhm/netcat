@@ -1050,7 +1050,7 @@ local_listen(const char *host, const char *port, struct addrinfo hints)
 
 		len = sizeof(ss);
 		if (getsockname(s, (struct sockaddr *)&ss, &len) == -1)
-		    err(1, "getsockname");
+			err(1, "getsockname");
 		report_sock(uflag ? "Bound" : "Listening",
 		    (struct sockaddr *)&ss, len, NULL);
 	}
