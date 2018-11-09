@@ -1,4 +1,4 @@
-/* $OpenBSD: netcat.c,v 1.197 2018/11/06 20:39:19 jsing Exp $ */
+/* $OpenBSD: netcat.c,v 1.198 2018/11/09 04:05:14 bluhm Exp $ */
 /*
  * Copyright (c) 2001 Eric Jackson <ericj@monkey.org>
  * Copyright (c) 2015 Bob Beck.  All rights reserved.
