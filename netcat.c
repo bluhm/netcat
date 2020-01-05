@@ -597,7 +597,8 @@ main(int argc, char *argv[])
 
 				if (vflag)
 					report_sock("Connection received",
-					    (struct sockaddr *)&z, len, NULL);
+					    (struct sockaddr *)&z, len,
+					    family == AF_UNIX ? host : NULL);
 
 				readwrite(s, NULL);
 			} else {
