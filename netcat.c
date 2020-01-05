@@ -1784,11 +1784,14 @@ report_sock(const char *msg, const struct sockaddr *sa, socklen_t salen,
 	if (nflag)
 		flags |= NI_NUMERICHOST;
 
-	if ((herr = getnameinfo(sa, salen, host, sizeof(host),
-	    port, sizeof(port), flags)) != 0) {
-		if (herr == EAI_SYSTEM)
+	herr = getnameinfo(sa, salen, host, sizeof(host), port, sizeof(port),
+	    flags);
+	switch (herr) {
+		case 0:
+			break;
+		case EAI_SYSTEM:
 			err(1, "getnameinfo");
-		else
+		default:
 			errx(1, "getnameinfo: %s", gai_strerror(herr));
 	}
 
