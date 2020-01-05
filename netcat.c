@@ -375,8 +375,8 @@ main(int argc, char *argv[])
 		if (family == AF_UNIX) {
 			if (unveil(host, "rwc") == -1)
 				err(1, "unveil");
-			if (uflag && !lflag) {
-				if (sflag) {
+			if (uflag) {
+				if (sflag && !lflag) {
 					if (unveil(sflag, "rwc") == -1)
 						err(1, "unveil");
 				} else {
