@@ -376,8 +376,13 @@ main(int argc, char *argv[])
 			if (unveil(host, "rwc") == -1)
 				err(1, "unveil");
 			if (uflag && !lflag) {
-				if (unveil(sflag ? sflag : "/tmp", "rwc") == -1)
-					err(1, "unveil");
+				if (sflag) {
+					if (unveil(sflag, "rwc") == -1)
+						err(1, "unveil");
+				} else {
+					if (unveil("/tmp", "rwc") == -1)
+						err(1, "unveil");
+				}
 			}
 		} else {
 			/* no filesystem visibility */
