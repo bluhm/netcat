@@ -580,6 +580,10 @@ main(int argc, char *argv[])
 			if (s == -1)
 				err(1, NULL);
 			if (uflag && kflag) {
+				if (family == AF_UNIX) {
+					if (pledge("stdio unix", NULL) == -1)
+						err(1, "pledge");
+				}
 				/*
 				 * For UDP and -k, don't connect the socket,
 				 * let it receive datagrams from multiple
@@ -606,6 +610,10 @@ main(int argc, char *argv[])
 				if (rv == -1)
 					err(1, "connect");
 
+				if (family == AF_UNIX) {
+					if (pledge("stdio unix", NULL) == -1)
+						err(1, "pledge");
+				}
 				if (vflag)
 					report_sock("Connection received",
 					    (struct sockaddr *)&z, len,
