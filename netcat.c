@@ -371,12 +371,18 @@ main(int argc, char *argv[])
 			err(1, "unveil");
 		if (oflag && unveil(oflag, "r") == -1)
 			err(1, "unveil");
+	} else if (family == AF_UNIX && uflag && lflag && !kflag) {
+		/*
+		 * After recvfrom(2) from client, the server connects
+		 * to the client socket.  As the client path is determined
+		 * during runtime, we cannot unveil(2).
+		 */
 	} else {
 		if (family == AF_UNIX) {
 			if (unveil(host, "rwc") == -1)
 				err(1, "unveil");
-			if (uflag) {
-				if (sflag && !lflag) {
+			if (uflag && !kflag) {
+				if (sflag) {
 					if (unveil(sflag, "rwc") == -1)
 						err(1, "unveil");
 				} else {
