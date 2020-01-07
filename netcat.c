@@ -864,8 +864,9 @@ tls_setup_server(struct tls *tls_ctx, int connfd, char *host)
 			report_tls(tls_cctx, host);
 		if ((TLSopt & TLS_CCERT) && !gotcert)
 			warnx("No client certificate provided");
-		else if (gotcert && tls_peer_cert_hash(tls_ctx) && tls_expecthash &&
-		    strcmp(tls_expecthash, tls_peer_cert_hash(tls_ctx)) != 0)
+		else if (gotcert && tls_expecthash &&
+		    tls_peer_cert_hash(tls_cctx) &&
+		    strcmp(tls_expecthash, tls_peer_cert_hash(tls_cctx)) != 0)
 			warnx("peer certificate is not %s", tls_expecthash);
 		else if (gotcert && tls_expectname &&
 		    (!tls_peer_cert_contains_name(tls_cctx, tls_expectname)))
