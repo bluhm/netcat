@@ -336,11 +336,11 @@ socks_connect(const char *host, const char *port,
 		}
 		if (r < 0 || (size_t)r >= sizeof(buf))
 			errx(1, "hostname too long");
-		r = strlen(buf);
+		wlen = strlen(buf);
 
-		cnt = atomicio(vwrite, proxyfd, buf, r);
-		if (cnt != r)
-			err(1, "write failed (%zu/%d)", cnt, r);
+		cnt = atomicio(vwrite, proxyfd, buf, wlen);
+		if (cnt != wlen)
+			err(1, "write failed (%zu/%zu)", cnt, wlen);
 
 		if (authretry > 1) {
 			char proxypass[256];
@@ -359,9 +359,10 @@ socks_connect(const char *host, const char *port,
 			    "Basic %s\r\n", resp);
 			if (r < 0 || (size_t)r >= sizeof(buf))
 				errx(1, "Proxy auth response too long");
-			r = strlen(buf);
-			if ((cnt = atomicio(vwrite, proxyfd, buf, r)) != r)
-				err(1, "write failed (%zu/%d)", cnt, r);
+			wlen = strlen(buf);
+			cnt = atomicio(vwrite, proxyfd, buf, wlen);
+			if (cnt != wlen)
+				err(1, "write failed (%zu/%zu)", cnt, wlen);
 			explicit_bzero(proxypass, sizeof proxypass);
 			explicit_bzero(buf, sizeof buf);
 		}
